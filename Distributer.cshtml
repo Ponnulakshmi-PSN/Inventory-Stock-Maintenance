@@ -1,0 +1,443 @@
+﻿@model InventoryStockMaintenance.Application.Usecases.Category.CategoryResponse
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+
+@{
+    var baseUrl = Configuration.GetSection("API:BaseURL").Value;
+}
+
+<html>
+    <head>
+       
+    </head>
+    <body>
+    <div class="row">
+        <div class="col-sm-12">
+            <div>
+                <h2 class="page-title">
+                    <span>Add Distributer</span>
+                </h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-4 col-lg-4">
+                <div class="card-box" style="padding:15px 10px 15px 10px; box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;">
+                    <div>
+                        <h5> Add/Update</h5>
+                        <input asp-for="Id" type="hidden" class="Id" />
+                        <div class="input-data">
+                            <label>Distributer Name</label>
+                            <span class="errorstring">&nbsp;&nbsp;*</span>
+                            <input type="text" id="distributerName" style="border:1px solid;" class="input-field" maxlength="50">
+                            <span id="dName" class="text-danger"></span>
+                        </div>
+                        <div class="input-data">
+                            <label>Organization Name</label>
+                            <span class="errorstring">&nbsp;&nbsp;*</span>
+                            <input type="text" id="organizationName" style="border:1px solid;" class="input-field">
+                            <span id="dDesc" class="text-danger"></span>
+                        </div>
+                        <div class="input-data">
+                            <label>Contact Number</label>
+                            <span class="errorstring">&nbsp;&nbsp;*</span>
+                            <input type="text" id="contactNumber"maxlength="10" style="border:1px solid;" class="input-field">
+                            <span id="num" class="text-danger"></span>
+                        </div>
+                       
+                        <div class="form-group">
+                            <div class="input-data">
+                                <label>Active Status</label>
+                                <span class="errorstring">&nbsp;&nbsp;*</span><br />
+                                <input type="radio" asp-for="ActiveStatus" id="statusTrue" value="True" checked="checked" /> Active &nbsp;&nbsp;
+                                <input type="radio" asp-for="ActiveStatus" id="statusFalse" value="False" />Inactive
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label></label>
+                        <div class="input-data">
+                            <input type="submit" value="Update" id="update" style="background: linear-gradient(to right, #004e92, #000428);padding: 1px 20px;display:none; color: white;border:none;" onclick="UpdateDistributer()" />
+                            <input type="submit" value="Save" id="create" style="background: linear-gradient(to right, #004e92, #000428);padding: 1px 20px; color: white; border:none;" onclick="AddDistributer()" />
+                            <button style="padding: 1px 20px;border:none;" id="clear">Clear </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            <div class="col-8 col-lg-8">
+                <div class="card" style="padding:15px 10px 15px 10px; box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px; max-height: 75%;">
+                    <div class="display table-responsive" style="width:100%;">
+                        <table class="display" id="distributerTable" style="width:100% !important">
+                            <thead style="background: linear-gradient(to right, #004e92, #000428); color:white;">
+                                <tr>
+                                    <th>S.NO</th>
+                                    <th>Distributer Name</th>
+                                    <th>Organization Name</th>
+                                    <th>Contact Number</th>
+                                    <th>Active Status</th>
+                                    <th>Created Date</th>
+                                    <th>Edit | Delete</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    @Html.Hidden("RedirectTo", Url.Action("Distributer", "Distributer"))
+    <script src="~/js/jquery.js"></script>
+    <script>
+        $(document).ready(function () {
+            var accessToken = localStorage.getItem("token");
+            const tokenExpires = parseInt(localStorage.getItem("tokenExpires"));
+            const expirationTimeInMillis = tokenExpires * 60000;
+            const expiresIn = Date.now() + expirationTimeInMillis;
+            setTimeout(function () {
+                localStorage.removeItem("token");
+                localStorage.clear();
+                localStorage.removeItem("tokenExpires");
+                Swal.fire("Session Timeout!").then(() => {
+                    window.location.href = $("#RedirectTo").val();
+                });
+            }, expirationTimeInMillis);
+
+            fetch('@baseUrl/Distributer/1.0', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + accessToken,
+                    'Content-Type': 'application/json'
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    data.forEach((item, index) => {
+                        item.SNO = index + 1;
+                    });
+
+                    $("#distributerTable").DataTable({
+                        data: data,
+                        columns: [
+                            { data: 'SNO' },
+                            { data: 'distributerName' },
+                            { data: 'organizationName' },
+                            { data: 'contactNumber' },
+                            {
+                                data: 'activeStatus',
+                                render: function (data, type, row) {
+                                    if (data === true) {
+                                        return '<img src="/Image/active_img.png" alt="active" style="height: 20px; width: 50px;" />';
+                                    } else {
+                                        return '<img src="/Image/inactive_img.png" alt="active"style="height: 20px; width: 50px;"  />';
+                                    }
+                                }
+                            },
+                            {
+                                data: 'createdOn',
+                                render: function (data, type, row) {
+                                    var dateObj = new Date(data);
+                                    var formattedDate = formatDate(dateObj);
+                                    return formattedDate;
+                                }
+                            },
+                            { data: null }
+
+                        ],
+                        columnDefs: [
+                            {
+                                targets: -1,
+                                render: function (data, type, row) {
+                                    var editButtonHtml = '<button class="btn editButton" data-id="' + row.id + '" onclick="editButtonClicked(event)"><img src="/Image/edit_img.png" style="height:22px;width:22px;position:relative;" /></button>';
+                                    var deleteButtonHtml = '<button class="ms-3 btn deleteButton" data-id="' + row.id + '"><img src="/Image/delete_img.png" style="height:22px;width:22px;position:relative;" /></button>';
+                                    var buttonsDivHtml = '<div class="d-flex" >' + editButtonHtml + deleteButtonHtml + '</div>';
+                                    return buttonsDivHtml;
+                                }
+                            }
+                        ]
+                    });
+                    $("#distributerTable").on('click', '.deleteButton', function () {
+                        var id = $(this).data('id');
+                        console.log('Delete button clicked for id: ' + id);
+                        Swal.fire({
+                            title: 'Are you sure?',
+                            text: 'You are about to delete this item.',
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#3085d6',
+                            cancelButtonColor: '#d33',
+                            confirmButtonText: 'Yes, delete it!'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                fetch('@baseUrl/Distributer/1.0/' + id, {
+                                    method: 'DELETE',
+                                    headers: {
+                                        'Authorization': 'Bearer ' + accessToken,
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({ id: id })
+                                })
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        console.log('Success:', data);
+                                        Swal.fire(
+                                            'Deleted!',
+                                            'Your item has been deleted.',
+                                            'success'
+                                        ).then(() => {
+                                            location.reload();
+                                        });
+                                    })
+                                    .catch((error) => {
+                                        console.error('Error:', error);
+                                        Swal.fire(
+                                            'Error!',
+                                            'An error occurred while deleting the item.',
+                                            'error'
+                                        );
+                                    });
+                            }
+                        });
+                    })
+
+                })
+                .catch(error => {
+                    console.log(error);
+                });
+
+            $('#update').click(function (event) {
+                event.preventDefault();
+            });
+            $("#clear").click(function () {
+                window.location.reload();
+            });
+            $('#create').click(function (event) {
+                event.preventDefault();
+            });
+        });
+
+        function formatDate(date) {
+            var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            var dd = date.getDate();
+            var mm = months[date.getMonth()];
+            var yyyy = date.getFullYear();
+            var hh = date.getHours();
+            var min = date.getMinutes();
+            var ss = date.getSeconds();
+            var ampm = hh >= 12 ? 'PM' : 'AM';
+            hh = hh % 12;
+            hh = hh ? hh : 12; // the hour '0' should be '12'
+            min = min < 10 ? '0' + min : min;
+            ss = ss < 10 ? '0' + ss : ss;
+            var formattedDate = dd + ' ' + mm + ' ' + yyyy;
+            return formattedDate;
+        }
+
+        async function AddDistributer() {
+            console.log("Add Distributer");
+            var distributername = $("#distributerName").val();
+            var distributerOrganization = $("#organizationName").val();
+            var contactNumber = $("#contactNumber").val();
+            var status = $("#statusTrue").is(":checked");
+            var createdBy = localStorage.getItem("AdminId");
+            var errors = [];          
+            if (distributername == "" || distributername == null) {
+                errors.push("Distributer Name is required");
+                $("#dName").text("Distributer Name is required");
+            }
+            else {
+                $("#dName").text("");
+            }
+            if (distributerOrganization == "" || distributerOrganization == null) {
+                errors.push("Distributer Organization is required");
+                $("#dDesc").text("Distributer Organization is required");
+            }
+            else {
+                $("#dDesc").text("");
+            }
+
+            if (errors.length === 0) {
+                var data = {
+                    DistributerName: distributername,
+                    OrganizationName: distributerOrganization,
+                    ContactNumber: contactNumber,
+                    ActiveStatus: status,
+                    CreatedBy: createdBy
+                }
+                var accessToken = localStorage.getItem("token");
+                console.log(accessToken);
+                const url = '@baseUrl/Distributer/1.0';           
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + accessToken,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                if (response.status === 201) {
+                    const responseData = await response.json();
+                    Swal.fire(
+                        'Success!',
+                        'Distributer Created successfully.',
+                        'success'
+                    ).then(() => {
+                        const redirectTo = $("#RedirectTo").val();
+                        window.location.href = redirectTo;
+                    });
+                } else if (response.status === 409) {
+                    Swal.fire(
+                        'Error!',
+                        'Distributer Name AlreadyExist.',
+                        'error'
+                    ).then(() => {
+                        const redirectTo = $("#RedirectTo").val();
+                        window.location.href = redirectTo;
+                    });
+                }
+                else if (response.status === 400) {
+                    Swal.fire(
+                        'Error!',
+                        'An error occurred while adding Distributer.',
+                        'error'
+                    ).then(() => {
+                        window.location.reload();
+                    });
+                } 
+                else {
+                    Swal.fire(
+                        'Error!',
+                        'Failed to add the item. Please try again.',
+                        'error'
+                    ).then(() => {
+                        window.location.reload();
+                    });
+                }
+            }
+        }
+
+        async function UpdateDistributer() {
+            var distributerId = $(".Id").val();
+            var distributername = $("#distributerName").val();
+            var distributerOrganization = $("#organizationName").val();
+            var contactNumber = $("#contactNumber").val();
+            var status = $("#statusTrue").is(":checked");
+            var updatedBy = localStorage.getItem("AdminId");
+           localStorage.setItem("distributerId", distributerId);
+           console.log(distributerId);
+            var errors = [];
+            if (distributername == "" || distributername == null) {
+                errors.push("Distributer Name is required");
+                $("#dName").text("Distributer Name is required");
+            }
+            else {
+                $("#dName").text("");
+            }
+            if (distributerOrganization == "" || distributerOrganization == null) {
+                errors.push("Distributer Organization is required");
+                $("#dDesc").text("Distributer Organization is required");
+            }
+            else {
+                $("#dDesc").text("");
+            }
+
+            if (errors.length === 0) {
+                var data = {
+                    Id: distributerId,
+                    DistributerName: distributername,
+                    OrganizationName: distributerOrganization,
+                    ContactNumber: contactNumber,
+                    ActiveStatus: status,                    
+                    ModifiedBy: updatedBy
+                }
+                var accessToken = localStorage.getItem("token");
+                console.log(accessToken);
+                var distributerId = localStorage.getItem("distributerId");
+                const response = await fetch('@baseUrl/Distributer/1.0/' + distributerId, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': 'Bearer ' + accessToken,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                if (response.status === 204) {
+                    Swal.fire(
+                        'Success!',
+                        'Distributer Updated successfully.',
+                        'success'
+                    ).then(() => {
+                        const redirectTo = $("#RedirectTo").val();
+                        window.location.href = redirectTo;
+                    });
+                }
+                else if (response.status === 400) {
+                    Swal.fire(
+                        'Error!',
+                        'An error occurred while adding Distributer.',
+                        'error'
+                    ).then(() => {
+                        window.location.reload();
+                    });
+                }
+                else {
+                    Swal.fire(
+                        'Error!',
+                        'Failed to add the item. Please try again.',
+                        'error'
+                    ).then(() => {
+                        window.location.reload();
+                    });
+                }
+            }
+        }
+
+        async function editButtonClicked(event) {
+            var button = event.target.closest('.editButton');
+            var distributerId = button.getAttribute('data-id');
+            var accessToken = localStorage.getItem("token");
+
+            console.log('Edit button clicked for id: ' + distributerId);
+            try {
+                console.log("inside edit mode")
+                var response = await fetch('@baseUrl/Distributer/1.0/' + distributerId, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + accessToken,
+                        'content-type': 'application/json',
+                    }
+                }).then(response => {
+                    if (!response.ok) {
+                        throw new Error("An error occurred");
+                    }
+                    console.log("below if");
+                    return response.json();
+                }).then(data => {
+                    console.log(data);             
+                   
+                    $(".Id").val(data.id);
+                    $("#distributerName").val(data.distributerName);
+                    $("#organizationName").val(data.organizationName);
+                    $("#contactNumber").val(data.contactNumber);
+                    if (data.activeStatus === true) {
+                        $("#statusTrue").prop("checked", true);
+                    } else {
+                        $("#statusFalse").prop("checked", true);
+                    }                  
+                }).catch(error => {
+                    console.log(error);
+                });
+                $("#update").show();
+                $("#create").hide();
+            }
+            catch (error) {
+            }
+        }
+    </script>
+    </body>
+</html>

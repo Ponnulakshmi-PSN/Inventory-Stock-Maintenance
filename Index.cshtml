@@ -1,0 +1,565 @@
+﻿@model InventoryStockMaintenance.Application.Usecases.Product.ProductResponse
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+
+@{
+    var imageUrl = Configuration.GetSection("Image:LoadUrl").Value;
+    var baseUrl = Configuration.GetSection("API:BaseURL").Value;
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<html>
+<head>
+    <style>
+        td {
+            text-align: center !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="row">
+        <div class="col-sm-12">
+            <div>
+                <h2 class="page-title">
+                    <span>Add Products</span>
+                </h2>
+            </div>
+        </div>
+    </div>
+  <div class="container-fluid">
+        <div class="row">
+            <div class="col-4 col-lg-4">
+                <div class="card-box" style="padding:20px; box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;">
+                    <div>
+                        <h5> Add/Update</h5>
+                        <input asp-for="Id" type="hidden" class="Id" />
+                        <div class="form-row">
+                            <div class="input-data">
+                                <label>Category</label>
+                                <span class="errorstring">&nbsp;&nbsp;*</span><br />
+                                <select style="width:100%; padding:4px;" id="category">
+                                </select>
+                                <span id="categoryError" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="input-data">
+                            <label>Product Name</label>
+                            <span class="errorstring">&nbsp;&nbsp;*</span>
+                            <input type="text" id="productName" style="border:1px solid;" maxlength="50" class="input-field">
+                            <span id="PName" class="text-danger"></span>
+                        </div>
+                        <div class="input-data">
+                            <label>Product Description</label>
+                            <input type="text" id="productDescription" style="border:1px solid;"maxlength="500" class="input-field">
+                            <span id="PDesc" class="text-danger"></span>
+                        </div>
+                        <div id="imagePreview" style="margin-top: 10px">
+                            <img id="previewImg" src="" alt="Image Preview" style="height: 75px; width: 80px; display: none;" />
+                        </div>
+                        <div class="form-group">
+                            <label>Upload File</label>
+                            <span class="errorstring">&nbsp;&nbsp;*</span>
+                            <input id="Resource" type="file" class="form-control" style="font-size:15px;border:1px solid; border-radius: 1px;" accept=".png, .jpg, .jpeg" required />
+                            <span id="resourceFileError" class="text-danger"></span>
+                        </div>
+                        <div class="form-group">
+                            <div class="input-data">
+                                <label>Active Status</label>
+                                <span class="errorstring">&nbsp;&nbsp;*</span><br />
+                                <input type="radio" asp-for="ActiveStatus" id="statusTrue" value="True" checked="checked" /> Active &nbsp;&nbsp;
+                                <input type="radio" asp-for="ActiveStatus" id="statusFalse" value="False" />Inactive
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label></label>
+                        <div class="input-data">
+                            <input type="submit" value="Update" id="update" style="background: linear-gradient(to right, #004e92, #000428)!important;padding: 1px 20px; color: white;border:none; display:none;" onclick="UpdateProducts()" />
+                            <input type="submit" value="Save" id="create" style="background: linear-gradient(to right, #004e92, #000428); color: white;padding: 1px 20px; border:none;" onclick="AddProducts()" />
+                            <button style="padding: 1px 20px; border:none;" id="clear">Clear </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-8 col-lg-8">
+                <div class="card" style="padding:20px; box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px; max-height: 75%;">
+                    <div class="display table-responsive" style="width:100%;">
+                        <table class="display" id="productTable" style="width:100% !important">
+                            <thead style="background: linear-gradient(to right, #004e92, #000428); color:white;">
+                                <tr>
+                                    <th>S.NO</th>
+                                    <th>Product Name</th>
+                                    <th>Product Description</th>
+                                    <th>Category</th>
+                                    <th>Resource</th>
+                                    <th>Active Status</th>
+                                    <th>Created Date</th>
+                                    <th>Edit | Delete</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+  </div>
+    @Html.Hidden("RedirectTo", Url.Action("Index", "Product"))
+    <script src="~/js/jquery.js"></script>
+
+    <script>
+        $(document).ready(function () {
+            loadCategories();
+            var accessToken = localStorage.getItem("token");
+            const tokenExpires = parseInt(localStorage.getItem("tokenExpires"));
+            const expirationTimeInMillis = tokenExpires * 60000;
+            const expiresIn = Date.now() + expirationTimeInMillis;
+            setTimeout(function () {
+                localStorage.removeItem("token");
+                localStorage.clear();
+                localStorage.removeItem("tokenExpires");
+                Swal.fire("Session Timeout!").then(() => {
+                    window.location.href = $("#RedirectTo").val();
+                });
+            }, expirationTimeInMillis);
+
+            fetch('@baseUrl/Product/1.0', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + accessToken,
+                    'Content-Type': 'application/json'
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    data.forEach((item, index) => {
+                        item.SNO = index + 1;
+                    });
+
+                    $("#productTable").DataTable({
+                        data: data,
+                        columns: [
+                            { data: 'SNO' },
+                            { data: 'productName' },
+                            { data: 'productDescription' },
+                            { data: 'categoryName' },
+                            {                             
+                                data: 'resourcePath',
+                                render: function (data, type, row) {
+                                    if (row.resourcePath != null) {
+                                        var imageName = row.resourcePath;
+                                        return '<img src="' + '@imageUrl' + '/' + imageName + '" style="height: 75px; width: 80px;" />';
+                                    } else {
+                                        return '';
+                                    }
+                                }
+                            },
+                            {
+                                data: 'activeStatus',
+                                render: function (data, type, row) {
+                                    if (data === true) {
+                                        return '<img src="/Image/active_img.png" alt="active" style="height: 20px; width: 50px;" />';
+                                    } else {
+                                        return '<img src="/Image/inactive_img.png" alt="active"style="height: 20px; width: 50px;"  />';
+                                    }
+                                }
+                            },
+                            {
+                                data: 'createdOn',
+                                render: function (data, type, row) {
+                                    var dateObj = new Date(data);
+                                    var formattedDate = formatDate(dateObj);
+                                    return formattedDate;
+                                }
+                            },
+                            { data: null }
+
+                        ],
+                        columnDefs: [
+                            {
+                                targets: -1,
+                                render: function (data, type, row) {
+                                    var editButtonHtml = '<button class="btn editButton" data-id="' + row.id + '" onclick="editButtonClicked(event)"><img src="/Image/edit_img.png" style="height:22px;width:22px;position:relative;" /></button>';
+                                    var deleteButtonHtml = '<button class="ms-3 btn deleteButton" data-id="' + row.id + '"><img src="/Image/delete_img.png" style="height:22px;width:22px;position:relative;" /></button>';
+                                    var buttonsDivHtml = '<div class="d-flex" >' + editButtonHtml + deleteButtonHtml + '</div>';
+                                    return buttonsDivHtml;
+                                }
+                            }
+                        ]
+                    });
+                    $("#productTable").on('click', '.deleteButton', function () {
+                        var id = $(this).data('id');
+                        console.log('Delete button clicked for id: ' + id);
+                        Swal.fire({
+                            title: 'Are you sure?',
+                            text: 'You are about to delete this item.',
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#3085d6',
+                            cancelButtonColor: '#d33',
+                            confirmButtonText: 'Yes, delete it!'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                fetch('@baseUrl/Product/1.0/' + id, {
+                                    method: 'DELETE',
+                                    headers: {
+                                        'Authorization': 'Bearer ' + accessToken,
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({ id: id })
+                                })
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        console.log('Success:', data);
+                                        Swal.fire(
+                                            'Deleted!',
+                                            'Your item has been deleted.',
+                                            'success'
+                                        ).then(() => {
+                                            location.reload();
+                                        });
+                                    })
+                                    .catch((error) => {
+                                        console.error('Error:', error);
+                                        Swal.fire(
+                                            'Error!',
+                                            'An error occurred while deleting the item.',
+                                            'error'
+                                        );
+                                    });
+                            }
+                        });
+                    })
+
+                })
+                .catch(error => {
+                    console.log(error);
+                });
+            $('#update').click(function (event) {
+                event.preventDefault();
+            });
+            $("#clear").click(function () {
+                window.location.reload();
+            });
+            $('#create').click(function (event) {
+                event.preventDefault();
+            });
+        });
+
+        async function loadCategories() {
+            try {
+                var categoryDropDown = await fetch('@baseUrl/Category/1.0/GetCategoryDropDown', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + localStorage.getItem("token")
+                    }
+                });
+                if (!categoryDropDown.ok) {
+                    throw new Error("An error occurred");
+                } console.log("below if");
+                var data = await categoryDropDown.json();
+                var selecElement = $("#category")[0];
+                selecElement.innerHTML = '';
+                var defaultOption = $("<option></option>")[0];
+                defaultOption.value = '';
+                defaultOption.textContent = 'Select Category';
+                selecElement.appendChild(defaultOption);
+
+                if (data && typeof data === 'object') {
+                    console.log("Inside");
+                    for (var key in data) {
+                        if (data.hasOwnProperty(key)) {
+
+                            var option = $("<option></option>")[0];
+                            option.value = data[key].id;
+                            option.textContent = data[key].name;
+                            selecElement.appendChild(option);
+                        }
+                    }
+                }
+                else {
+                    console.log("Data is not in the correct format");
+                }
+            }
+            catch (error) {
+                console.log("There was an error", error);
+            }
+        }
+
+        async function AddProducts() {
+            var productName = $("#productName").val();
+            var productDescription = $("#productDescription").val();
+            var category = $("#category").val();
+            var activeStatus = $("#statusTrue").is(':checked') ? true : false;
+            var createdBy = localStorage.getItem("AdminId");
+            var accessToken = localStorage.getItem("token");
+            var selectedResource = document.querySelector('input[type="file"]').files[0];
+            let errors = [];
+            if (selectedResource) {
+                var fileName = selectedResource.name;
+                var fileExtension = fileName.split('.').pop().toLowerCase();
+
+                if (fileExtension !== 'png' && fileExtension !== 'jpg' && fileExtension !== 'jpeg') {
+                    errors.push("Invalid file type. Only PNG, JPG, and JPEG files are allowed.");
+                    $("#resourceFileError").text("Invalid File");
+                } else {
+                    $("#resourceFileError").text("");
+                }
+            } else {
+                errors.push("Please upload a file.");
+                $("#resourceFileError").text("Please upload a file.");
+            }
+            if (productName == "") {
+                errors.push("Product Name is required");
+                $("#PName").text("Product Name is required");
+            } else {
+                $("#PName").text("");
+            }
+            if (category == "") {
+                errors.push("Category is required");
+                $("#categoryError").text("Category is required");
+            }
+            else {
+                $("#categoryError").text("");
+            }
+            if (errors.length === 0) {
+                var data = {
+                    ProductName: productName,
+                    ProductDescription: productDescription,
+                    CategoryId: category,
+                    ActiveStatus: activeStatus, // Convert boolean to string
+                    CreatedBy: createdBy,
+                    file: selectedResource
+                }
+
+                const formData = new FormData();
+                for (const key in data) {
+                    if (data[key] !== undefined && data[key] !== null) {
+                        formData.append(key, data[key]);
+                    }
+                }
+                console.log(formData, "form data");
+                console.log(data, "AddProduts data");
+                const url = '@baseUrl/Product/1.0';
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + accessToken,
+                    },
+                    body: formData
+                });
+                if (response.status === 201) {
+                    Swal.fire(
+                        'Success!',
+                        'Product Created successfully.',
+                        'success'
+                    ).then(() => {
+                        const redirectTo = $("#RedirectTo").val();
+                        window.location.href = redirectTo;
+                    });
+                }
+               else if (response.status === 409) {
+                    Swal.fire(
+                        'Error!',
+                        'Product Already Exist.',
+                        'Error'
+                    ).then(() => {
+                        const redirectTo = $("#RedirectTo").val();
+                        window.location.href = redirectTo;
+                    });
+                }
+                else if (response.status === 400) {
+                    Swal.fire(
+                        'Error!',
+                        'An error occurred while adding Product.',
+                        'error'
+                    ).then(() => {
+                        window.location.reload();
+                    });
+                }
+                else {
+                    Swal.fire(
+                        'Error!',
+                        'Failed to add the item. Please try again.',
+                        'error'
+                    ).then(() => {
+                        window.location.reload();
+                    });
+                }
+            }
+        }
+
+        function formatDate(date) {
+            var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            var dd = date.getDate();
+            var mm = months[date.getMonth()];
+            var yyyy = date.getFullYear();
+            var hh = date.getHours();
+            var min = date.getMinutes();
+            var ss = date.getSeconds();
+            var ampm = hh >= 12 ? 'PM' : 'AM';
+            hh = hh % 12;
+            hh = hh ? hh : 12; // the hour '0' should be '12'
+            min = min < 10 ? '0' + min : min;
+            ss = ss < 10 ? '0' + ss : ss;
+            var formattedDate = dd + ' ' + mm + ' ' + yyyy;
+            return formattedDate;
+        }
+
+        async function editButtonClicked(event) {
+            var button = event.target.closest('.editButton');
+            var productId = button.getAttribute('data-id');
+            var accessToken = localStorage.getItem("token");
+            $("#PName").text("");
+            $("#categoryError").text("");
+            $("#resourceFileError").text("");
+            console.log('Edit button clicked for id: ' + productId);
+            try {
+                console.log("inside edit mode")
+                var response = await fetch('@baseUrl/Product/1.0/' + productId, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + accessToken,
+                        'content-type': 'application/json',
+                    }
+                }).then(response => {
+                    if (!response.ok) {
+                        throw new Error("An error occurred");
+                    }
+                    console.log("below if");
+                    return response.json();
+                }).then(data => {
+                    console.log(data);
+                    $(".Id").val(data.id);
+                    $("#productName").val(data.productName);
+                    $("#productDescription").val(data.productDescription);
+                    $("#category").val(data.categoryId);
+                    if (data.activeStatus === true) {
+                        $("#statusTrue").prop("checked", true);
+                    } else {
+                        $("#statusFalse").prop("checked", true);
+                    }
+                    if (data.resourcePath) {
+                        console.log(data.resourcePath);
+                        document.getElementById('previewImg').src = '@imageUrl/' + data.resourcePath;
+                        document.getElementById('previewImg').style.display = 'block';
+                    } else {
+                        document.getElementById('previewImg').style.display = 'none';
+                    }
+
+                    // Set the file input value (this will only work in some browsers, otherwise it needs to be cleared)
+                    $("#Resource").val(data.resourcePath);
+
+                }).catch(error => {
+                    console.log(error);
+                });
+                $("#update").show();
+                $("#create").hide();
+            }
+            catch (error) {
+            }
+        }
+
+        async function UpdateProducts() {
+            console.log("UpdateProducts");
+            var productId= $(".Id").val();
+            var productName = $("#productName").val();
+            var productDescription = $("#productDescription").val();
+            var category = $("#category").val();
+            var activeStatus = $("#statusTrue").is(':checked') ? true : false;
+            var modifiedBy = localStorage.getItem("AdminId");
+            var accessToken = localStorage.getItem("token");
+            localStorage.setItem("productId", productId);
+            console.log(productId, "localstorage ProductId");
+            var selectedResource = document.querySelector('input[type="file"]').files[0];
+            var errors = [];
+            if (selectedResource) {
+                var fileName = selectedResource.name;
+                var fileExtension = fileName.split('.').pop().toLowerCase();
+
+                if (fileExtension !== 'png' && fileExtension !== 'jpg' && fileExtension !== 'jpeg') {
+                    errors.push("Invalid file type. Only PNG, JPG, and JPEG files are allowed.");
+                    $("#resourceFileError").text("Invalid File");
+                } else {
+                    $("#resourceFileError").text("");
+                }
+            } else {
+
+                $("#Resource").val();
+            }
+            if (productName == "") {
+                errors.push("Product Name is required");
+                $("#PName").text("Product Name is required");
+            } else {
+                $("#PName").text("");
+            }
+            if (category == "") {
+                errors.push("Category is required");
+                $("#categoryError").text("Category is required");
+            }
+            else {
+                $("#categoryError").text("");
+            }          
+            if(errors.length=== 0){
+                var data = {
+                    Id: productId,
+                    ProductName: productName,
+                    ProductDescription: productDescription,
+                    CategoryId: category,
+                    ActiveStatus: activeStatus, // Convert boolean to string
+                    ModifiedBy: modifiedBy,
+                    file: selectedResource
+                }
+                console.log(data);
+                const formData = new FormData();
+                for (const key in data) {
+                    if (data[key] !== undefined && data[key] !== null) {
+                        formData.append(key, data[key]);
+                    }
+                }
+                var accessToken = localStorage.getItem("token");
+                var productId = localStorage.getItem("productId");
+                const response = await fetch('@baseUrl/Product/1.0/' + productId, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': 'Bearer ' + accessToken,
+                    },
+                    body: formData
+                });
+                if (response.status === 204) {
+                    Swal.fire(
+                        'Success!',
+                        'Product Updated successfully.',
+                        'success'
+                    ).then(() => {
+                        const redirectTo = $("#RedirectTo").val();
+                        window.location.href = redirectTo;
+                    });
+                }
+                else if (response.status === 400) {
+                    Swal.fire(
+                        'Error!',
+                        'An error occurred while updating the item.',
+                        'error'
+                    ).then(() => {
+                        const redirectTo = $("#RedirectTo").val();
+                        window.location.href = redirectTo;
+                    });
+                }
+                else {
+                    Swal.fire(
+                        'Error!',
+                        'Failed to update the item. Please try again.',
+                        'error'
+                    ).then(() => {
+                        const redirectTo = $("#RedirectTo").val();
+                        window.location.href = redirectTo;
+                    });
+                }
+            }
+
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,657 @@
+﻿@model InventoryStockMaintenance.Application.Usecases.StockDistribution.StockDistributeResponse
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+
+@{
+    var imageUrl = Configuration.GetSection("Image:LoadUrl").Value;
+    var baseUrl = Configuration.GetSection("API:BaseURL").Value;
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<html>
+    <head>
+        <style>
+            td {
+                text-align: center !important;
+            }
+        </style>
+    </head>
+
+    <body>
+    <div class="row">
+        <div class="col-sm-12">
+            <div>
+                <h2 class="page-title">
+                    <span>Distribute Stocks</span>
+                </h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+     <div class="container-fluid">
+         <div class="row">
+                <div class="col-4 col-lg-4">
+                    <div class="card-box" style="padding:15px 10px 15px 10px; box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;">
+                        <div>
+                            <h5> </h5>
+                            <input asp-for="Id" type="hidden" class="Id" />
+                            <div class="form-row">
+                                <div class="input-data">
+                                    <label>Category</label>
+                                    <span class="errorstring">&nbsp;&nbsp;*</span><br />
+                                    <select style="width:100%; padding:4px;" id="category">
+                                    </select>
+                                    <span id="categoryError" class="text-danger"></span>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="input-data">
+                                    <label>Products</label>
+                                    <span class="errorstring">&nbsp;&nbsp;*</span><br />
+                                    <select style="width:100%; padding:4px;" id="product"></select>
+                                    <span id="productError" class="text-danger"></span>
+                                </div>
+                            </div>
+                            <div class="input-data">
+                                <label>Avilable Stocks</label>
+                                <span class="errorstring">&nbsp;&nbsp;*</span>
+                                <input type="text" id="AvlStocks" style="border:1px solid;" class="input-field">
+                                <span id="stockError" class="text-danger"></span>
+                            </div>
+                            <div class="form-row">
+                                <div class="input-data">
+                                    <label>Distributer</label>
+                                    <span class="errorstring">&nbsp;&nbsp;*</span><br />
+                                    <select style="width:100%; padding:4px;" id="distributer"></select>
+                                    <span id="distributeError" class="text-danger"></span>
+                                </div>
+                            </div>
+                            <div class="input-data">
+                                <label>Stocks To be Distributed</label>
+                                <span class="errorstring">&nbsp;&nbsp;*</span>
+                                <input type="text" id="distributedStock" style="border:1px solid;" class="input-field">
+                                <span id="disStocksError" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div>
+                            <label></label>
+                            <div class="input-data">
+                                <input type="submit" value="Update" id="update" style="background: linear-gradient(to right, #004e92, #000428);padding: 1px 20px;display:none; color: white;border:none;" onclick="UpdateStockDistribution()" />
+                                <input type="submit" value="Save" id="create" style="background: linear-gradient(to right, #004e92, #000428);padding: 1px 20px; color: white; border:none;" onclick="AddStockDistribution()" />
+                                <button style="padding: 1px 20px;border:none;" id="clear">Clear </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-8 col-lg-8">
+                    <div class="card" style="padding:20px; box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;">
+                        <div class="display table-responsive" style="width:100%;">
+                            <table class="display" id="distributeTable" style="width:100% !important">
+                                <thead style="background: linear-gradient(to right, #004e92, #000428); color:white;">
+                                    <tr>
+                                        <th>S.NO</th>
+                                        <th>Product Name</th>
+                                        <th>Category</th>
+                                        <th>Distributer Name</th>
+                                        <th>Resource</th>
+                                        <th>Distributed Stocks</th>
+                                        <th>Active Status</th>
+                                        <th>Distributed Date</th>
+                                        <th>Update</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+         </div>
+           
+     </div>
+    </div>
+    @Html.Hidden("RedirectTo", Url.Action("StockDistribution", "StockDistribute"))
+    <script src="~/js/jquery.js"></script>
+    <script>
+        $(document).ready(function () {
+            var accessToken = localStorage.getItem("token");
+            const tokenExpires = parseInt(localStorage.getItem("tokenExpires"));
+            const expirationTimeInMillis = tokenExpires * 60000;
+            const expiresIn = Date.now() + expirationTimeInMillis;
+            setTimeout(function () {
+                localStorage.removeItem("token");
+                localStorage.clear();
+                localStorage.removeItem("tokenExpires");
+                Swal.fire("Session Timeout!").then(() => {
+                    window.location.href = $("#RedirectTo").val();
+                });
+            }, expirationTimeInMillis);
+            GetProducts();
+
+            loadCategories();
+            loadDistributer();
+            $("#AvlStocks").prop("disabled", true);
+
+            $("#product").prop("disabled", true).css("background-color", "rgb(0 0 0 / 7%)");
+            $("#category").change(function () {
+                categoryId = $(this).val();
+                $("#product").prop("disabled", false).css("background-color", "white");
+                loadProducts();
+            });
+            $("#product").change(function () {
+                productId = $(this).val();
+                loadAvailableStocks();
+            });
+
+            fetch('@baseUrl/StockDistribution/1.0', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + accessToken,
+                    'Content-Type': 'application/json'
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data,"dataaaaaaaaaaaa");
+                    data.forEach((item, index) => {
+                        item.SNO = index + 1;
+                    });
+
+                    $("#distributeTable").DataTable({
+                        data: data,
+                        columns: [
+                            { data: 'SNO' },
+                            { data: 'productName' },
+                            { data: 'categoryName' },
+                            { data: 'distributerName' },
+                            {
+                                data: 'resource',
+                                render: function (data, type, row) {
+                                    if (row.resource != null) {
+                                        var imageName = row.resource;
+                                        return '<img src="' + '@imageUrl' + '/' + imageName + '" style="height: 75px; width: 80px;" />';
+                                    } else {
+                                        return '';
+                                    }
+                                }
+                            },
+                            { data: 'totalStock'},
+                            {
+                                data: 'activeStatus',
+                                render: function (data, type, row) {
+                                    if (data === true) {
+                                        return '<img src="/Image/active_img.png" alt="active" style="height: 20px; width: 50px;" />';
+                                    } else {
+                                        return '<img src="/Image/inactive_img.png" alt="active"style="height: 20px; width: 50px;"  />';
+                                    }
+                                }
+                            },
+                            {
+                                data: 'createdOn',
+                                render: function (data, type, row) {
+                                    var dateObj = new Date(data);
+                                    var formattedDate = formatDate(dateObj);
+                                    return formattedDate;
+                                }
+                            },
+                            {data:null}
+                        ],
+                        columnDefs: [
+                            {
+                                targets: -1,
+                                render: function (data, type, row) {
+                                    var editButtonHtml = '<button class="btn editButton" data-id="' + row.id + '" onclick="editButtonClicked(event)"><img src="/Image/edit_img.png" style="height:22px;width:22px;position:relative;" /></button>';
+                                    return editButtonHtml;
+                                }
+                            }
+                        ]
+                    });
+                })
+                .catch(error => {
+                    console.log(error);
+                });
+
+        });
+
+        async function loadCategories() {
+            try {
+                var categoryDropDown = await fetch('@baseUrl/Category/1.0/GetCategoryDropDown', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + localStorage.getItem("token")
+                    }
+                });
+                if (!categoryDropDown.ok) {
+                    throw new Error("An error occurred");
+                } console.log("below if");
+                var data = await categoryDropDown.json();
+                var selecElement = $("#category")[0];
+                selecElement.innerHTML = '';
+                var defaultOption = $("<option></option>")[0];
+                defaultOption.value = '';
+                defaultOption.textContent = 'Select Category';
+                selecElement.appendChild(defaultOption);
+
+                if (data && typeof data === 'object') {
+                    console.log("Inside");
+                    for (var key in data) {
+                        if (data.hasOwnProperty(key)) {
+
+                            var option = $("<option></option>")[0];
+                            option.value = data[key].id;
+                            option.textContent = data[key].name;
+                            selecElement.appendChild(option);
+                        }
+                    }
+                }
+                else {
+                    console.log("Data is not in the correct format");
+                }
+            }
+            catch (error) {
+                console.log("There was an error", error);
+            }
+        }
+
+        async function loadProducts() {
+            try {
+                var categoryId = $("#category").val();
+                var categoryDropDown = await fetch('@baseUrl/Product/1.0/GetProductBasedCategory/' + categoryId, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + localStorage.getItem("token")
+                    }
+                });
+                if (!categoryDropDown.ok) {
+                    throw new Error("An error occurred");
+                } console.log("below if");
+                var data = await categoryDropDown.json();
+                var selecElement = $("#product")[0];
+                selecElement.innerHTML = '';
+                var defaultOption = $("<option></option>")[0];
+                defaultOption.value = '';
+                defaultOption.textContent = 'Select Product';
+                selecElement.appendChild(defaultOption);
+
+                if (data && typeof data === 'object') {
+                    console.log("Inside");
+                    for (var key in data) {
+                        if (data.hasOwnProperty(key)) {
+
+                            var option = $("<option></option>")[0];
+                            option.value = data[key].id;
+                            option.textContent = data[key].name;
+                            selecElement.appendChild(option);
+
+                            localStorage.getItem("productname", option.textContent);
+                            console.log(data[key].name, "option.textContent");
+                        }
+                    }
+                }
+                else {
+                    console.log("Data is not in the correct format");
+                }
+            }
+            catch (error) {
+                console.log("There was an error", error);
+            }
+        }
+
+        function formatDate(date) {
+            var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            var dd = date.getDate();
+            var mm = months[date.getMonth()];
+            var yyyy = date.getFullYear();
+            var hh = date.getHours();
+            var min = date.getMinutes();
+            var ss = date.getSeconds();
+            var ampm = hh >= 12 ? 'PM' : 'AM';
+            hh = hh % 12;
+            hh = hh ? hh : 12; // the hour '0' should be '12'
+            min = min < 10 ? '0' + min : min;
+            ss = ss < 10 ? '0' + ss : ss;
+            var formattedDate = dd + ' ' + mm + ' ' + yyyy;
+            return formattedDate;
+        }
+
+        async function loadDistributer() {
+            try {
+                var categoryDropDown = await fetch('@baseUrl/Distributer/1.0/GetDistributerDropDown', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + localStorage.getItem("token")
+                    }
+                });
+                if (!categoryDropDown.ok) {
+                    throw new Error("An error occurred");
+                } console.log("below if");
+                var data = await categoryDropDown.json();
+                var selecElement = $("#distributer")[0];
+                selecElement.innerHTML = '';
+                var defaultOption = $("<option></option>")[0];
+                defaultOption.value = '';
+                defaultOption.textContent = 'Select Distributer';
+                selecElement.appendChild(defaultOption);
+
+                if (data && typeof data === 'object') {
+                    console.log("Inside");
+                    for (var key in data) {
+                        if (data.hasOwnProperty(key)) {
+                            var option = $("<option></option>")[0];
+                            option.value = data[key].id;
+                            option.textContent = data[key].name;
+                            selecElement.appendChild(option);
+                        }
+                    }
+                }
+                else {
+                    console.log("Data is not in the correct format");
+                }
+            }
+            catch (error) {
+                console.log("There was an error", error);
+            }
+        }
+
+        async function loadAvailableStocks() {
+            var productId = $("#product").val();
+            var categoryId = $("#category").val();
+            var accessToken = localStorage.getItem("token");
+            var AvailableStock = await fetch('@baseUrl/Product/1.0/GetTotalStock/'+ productId, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + accessToken
+                }
+            });
+            var data = await AvailableStock.json();
+            console.log("Available data", data);
+            console.log(data,"productsStocks");
+            for (var key in data) {
+                if (data.hasOwnProperty(key)) {
+                    var option = $("<option></option>")[0];
+                    option.value = data[key].name;                  
+                }
+            }         
+            $("#AvlStocks").val(data[0].name);
+            $("#AvlStocks").prop("disabled", true);
+            console.log(data);           
+        }
+
+        async function AddStockDistribution() {
+            var categoryId = $("#category").val();
+            var ProductId = $("#product").val();
+            var quantity = $("#AvlStocks").val();
+            var distributerId = $("#distributer").val();
+            var distributedStock= $("#distributedStock").val();
+            var createdBy = localStorage.getItem("AdminId");
+            var activeStatus = true;
+            var accessToken = localStorage.getItem("token");
+            let errors = [];
+            if (parseInt(quantity) === 0) {
+                console.log("Stocks Not Available");
+                errors.push("Stocks Not Available");
+                $("#stockError").text("Stocks Not Available");
+            }
+            if (parseInt(distributedStock) > parseInt(quantity)) 
+            {
+                console.log("Distributed Stock cannot be greater than Available Stock");
+                errors.push("Distributed Stock cannot be greater than Available Stock");
+                $("#disStocksError").text("Distributed Stock cannot be greater than Available Stock");
+            }
+            if (category == "") {
+                errors.push("Category is required");
+                $("#categoryError").text("Category is required");
+            }
+            else {
+                $("#categoryError").text("");
+            }
+            if (productId == "") {
+                errors.push("Product is required");
+                $("#productError").text("Category is required");
+            }
+            else {
+                $("#productError").text("");
+            }
+
+            if(errors.length===0){
+                var data={
+                    CategoryId: categoryId,
+                    ProductId: productId,
+                    DistributerId: distributerId,
+                    TotalStock: distributedStock,
+                    CreatedBy: createdBy,
+                    ActiveStatus: activeStatus
+                }
+                console.log(data);
+                var response = await fetch('@baseUrl/StockDistribution/1.0', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + accessToken
+                    },
+                    body: JSON.stringify(data)
+                });
+                if (response.status === 201) {
+                    Swal.fire(
+                        'Success!',
+                        'Stocks Distributed successfully.',
+                        'success'
+                    ).then(() => {
+                        const redirectTo = $("#RedirectTo").val();
+                        window.location.href = redirectTo;
+                    });
+                }
+                else if (response.status === 400) {
+                    Swal.fire(
+                        'Error!',
+                        'An error occurred while Adding the item.',
+                        'error'
+                    ).then(() => {
+                        const redirectTo = $("#RedirectTo").val();
+                        window.location.href = redirectTo;
+                    });
+                }
+                else {
+                    Swal.fire(
+                        'Error!',
+                        'Failed to update the item. Please try again.',
+                        'error'
+                    ).then(() => {
+                        const redirectTo = $("#RedirectTo").val();
+                        window.location.href = redirectTo;
+                    });
+                }
+            }
+
+            
+        }
+
+        async function editButtonClicked(event) {
+            var button = event.target.closest('.editButton');
+            var distributedId = button.getAttribute('data-id');
+            var accessToken = localStorage.getItem("token");
+
+            console.log('Edit button clicked for id: ' + distributedId);
+            try {
+                console.log("inside edit mode")
+                var response = await fetch('@baseUrl/StockDistribution/1.0/' + distributedId, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + accessToken,
+                        'content-type': 'application/json',
+                    }
+                }).then(response => {
+                    if (!response.ok) {
+                        throw new Error("An error occurred");
+                    }
+                    console.log("below if");
+                    return response.json();
+                }).then(data => {
+                    console.log(data);                  
+                    $(".Id").val(data.id);
+                    $("#category").val(data.categoryId);
+                    $("#product").val(data.productId);
+                    $("#AvlStocks").val(localStorage.getItem("AvlStocks"));
+                    $("#distributer").val(data.distributerId);
+                    $("#distributedStock").val(data.totalStock);
+                    loadAvailableStocks(data.productId);
+                    if (data.activeStatus === true) {
+                        $("#statusTrue").prop("checked", true);
+                    } else {
+                        $("#statusFalse").prop("checked", true);
+                    }
+                }).catch(error => {
+                    console.log(error);
+                });
+                $("#update").show();
+                $("#create").hide();
+            }
+            catch (error) {
+            }
+        }
+
+        async function UpdateStockDistribution() {
+            var distributedId = $(".Id").val();
+            var categoryId = $("#category").val();
+            var productId = $("#product").val();
+            console.log(productId, "productid");
+            var quantity = $("#AvlStocks").val();
+            var distributerId = $("#distributer").val();
+            var distributedStock = $("#distributedStock").val();
+            var modifiedBy = localStorage.getItem("AdminId");
+            localStorage.setItem("distributedId", distributedId);
+            var activeStatus = true;
+            var accessToken = localStorage.getItem("token");
+            let errors = [];
+            if (parseInt(distributedStock) > parseInt(quantity)) {
+                console.log("Distributed Stock cannot be greater than Available Stock");
+                errors.push("Distributed Stock cannot be greater than Available Stock");
+                $("#disStocksError").text("Distributed Stock cannot be greater than Available Stock");
+            }
+            if (parseInt(quantity) === 0) {
+                console.log("Stocks Not Available");
+                errors.push("Stocks Not Available");
+                $("#stockError").text("Stocks Not Available");
+            }
+            if (category == "") {
+                errors.push("Category is required");
+                $("#categoryError").text("Category is required");
+            }
+            else {
+                $("#categoryError").text("");
+            }
+            if (productId == "") {
+                errors.push("Product is required");
+                $("#productError").text("Category is required");
+            }
+            else {
+                $("#productError").text("");
+            }
+
+            if (errors.length === 0) {
+                var data = {
+                    Id: distributedId,
+                    CategoryId: categoryId,
+                    ProductId: productId,
+                    DistributerId: distributerId,
+                    TotalStock: distributedStock,
+                    ModifiedBy: modifiedBy,
+                    ActiveStatus: activeStatus
+                }
+                console.log(data);
+                var distributedId = localStorage.getItem("distributedId");
+                var response = await fetch('@baseUrl/StockDistribution/1.0' + "/" + distributedId, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + accessToken
+                    },
+                    body: JSON.stringify(data)
+                });
+                if (response.status === 204) {
+                    Swal.fire(
+                        'Success!',
+                        'Distributed Status Updated successfully.',
+                        'success'
+                    ).then(() => {
+                        const redirectTo = $("#RedirectTo").val();
+                        window.location.href = redirectTo;
+                    });
+                }
+                else if (response.status === 400) {
+                    Swal.fire(
+                        'Error!',
+                        'An error occurred while updating the item.',
+                        'error'
+                    ).then(() => {
+                        const redirectTo = $("#RedirectTo").val();
+                        window.location.href = redirectTo;
+                    });
+                }
+                else {
+                    Swal.fire(
+                        'Error!',
+                        'Failed to update the item. Please try again.',
+                        'error'
+                    ).then(() => {
+                        const redirectTo = $("#RedirectTo").val();
+                        window.location.href = redirectTo;
+                    });
+                }
+            }
+
+
+        }
+
+
+        async function GetProducts() {
+            try {
+                var categoryId = $("#category").val();
+                var categoryDropDown = await fetch('@baseUrl/Product/1.0', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + localStorage.getItem("token")
+                    }
+                });
+                if (!categoryDropDown.ok) {
+                    throw new Error("An error occurred");
+                } console.log("below if");
+                var data = await categoryDropDown.json();
+                var selecElement = $("#product")[0];
+                selecElement.innerHTML = '';
+                var defaultOption = $("<option></option>")[0];
+                defaultOption.value = '';
+                defaultOption.textContent = 'Select Product';
+                selecElement.appendChild(defaultOption);
+
+                if (data && typeof data === 'object') {
+                    console.log("Inside");
+                    for (var key in data) {
+                        if (data.hasOwnProperty(key)) {
+
+                            var option = $("<option></option>")[0];
+                            option.value = data[key].id;
+                            option.textContent = data[key].productName;
+                            selecElement.appendChild(option);
+
+                            localStorage.getItem("productname", option.textContent);
+                            console.log(data[key].name, "option.textContent");
+                        }
+                    }
+                }
+                else {
+                    console.log("Data is not in the correct format");
+                }
+            }
+            catch (error) {
+                console.log("There was an error", error);
+            }
+        }
+
+    </script>
+    </body>
+</html>

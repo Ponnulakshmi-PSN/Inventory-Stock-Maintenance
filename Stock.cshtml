@@ -1,0 +1,376 @@
+﻿@model InventoryStockMaintenance.Application.Usecases.Product.ProductResponse
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+
+@{
+    var imageUrl = Configuration.GetSection("Image:LoadUrl").Value;
+    var baseUrl = Configuration.GetSection("API:BaseURL").Value;
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+
+<html>
+<head>
+    <style>
+        td{
+            text-align:center !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="row">
+        <div class="col-sm-12">
+            <div>
+                <h2 class="page-title">
+                    <span>Add Stocks</span>
+                </h2>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-6">
+            <div class="card-box" style="padding:15px 10px 15px 10px; box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;">
+                <div>
+                    <h5> Add/Update</h5>
+                    <input asp-for="Id" type="hidden" class="Id" />
+                    <div class="form-row">
+                        <div class="input-data">
+                            <label>Category</label>
+                            <span class="errorstring">&nbsp;&nbsp;*</span><br />
+                            <select style="width:100%; padding:4px;" id="category">
+                            </select>
+                            <span id="categoryError" class="text-danger"></span>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="input-data">
+                            <label>Products</label>
+                            <span class="errorstring">&nbsp;&nbsp;*</span><br />
+                            <select style="width:100%; padding:4px;" id="product"></select>
+                            <span id="productError" class="text-danger"></span>
+                        </div>
+                    </div>
+                    <div class="input-data">
+                        <label>Quantity</label>
+                        <span class="errorstring">&nbsp;&nbsp;*</span>
+                        <input type="text" id="quantity" class="input-field">
+                        <span id="PQty" class="text-danger"></span>
+                    </div>
+                </div>
+                <div>
+                    <label></label>
+                    <div class="input-data">
+                        <input type="submit" value="Save" id="create" style="   background: linear-gradient(to right, #004e92, #000428)!important;padding: 1px 20px; color: white;border:none;" onclick="UpdateStocks()" />
+                        <button style="padding: 1px 20px; border:none;" id="clear">Clear </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="col-6">
+            <div class="card" style="padding:20px; box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px; max-height: 75%;">
+                <div class="display table-responsive" style="width:100%;">
+                    <table class="display" id="productTable" style="width:100% !important">
+                        <thead style="background: linear-gradient(to right, #004e92, #000428); color:white;">
+                            <tr>
+                                <th>S.NO</th>
+                                <th>Product</th>
+                                <th>Category</th>
+                                <th>Resource</th>
+                                <th>Stockes</th>
+                                <th>Created Date</th>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    @Html.Hidden("RedirectTo", Url.Action("Stock", "Product"))
+    <script src="~/js/jquery.js"></script>
+
+    <script>
+        $(document).ready(function () {
+            var accessToken = localStorage.getItem("token");
+            const tokenExpires = parseInt(localStorage.getItem("tokenExpires"));
+            const expirationTimeInMillis = tokenExpires * 60000;
+            const expiresIn = Date.now() + expirationTimeInMillis;
+            setTimeout(function () {
+                localStorage.removeItem("token");
+                localStorage.clear();
+                localStorage.removeItem("tokenExpires");
+                Swal.fire("Session Timeout!").then(() => {
+                    window.location.href = $("#RedirectTo").val();
+                });
+            }, expirationTimeInMillis);
+            loadCategories();
+            $("#product").prop("disabled", true).css("background-color", "rgb(0 0 0 / 7%)");
+            $("#category").change(function () { 
+                categoryId = $(this).val();
+                $("#product").prop("disabled", false);
+                loadProducts();
+                
+            });
+          
+            var accessToken = localStorage.getItem("token");
+            fetch('@baseUrl/Product/1.0', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + accessToken,
+                    'Content-Type': 'application/json'
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    data.forEach((item, index) => {
+                        item.SNO = index + 1;
+                    });
+
+                    $("#productTable").DataTable({
+                        data: data,
+                        columns: [
+                            { data: 'SNO' },
+                            { data: 'productName'},
+                            { data: 'categoryName'},
+                            {
+                                data: 'resourcePath',
+                                render: function (data, type, row) {
+                                    if (row.resourcePath != null) {
+                                        var imageName = row.resourcePath;
+                                        return '<img src="' + '@imageUrl' + '/' + imageName + '" style="height: 75px; width: 80px;" />';
+                                    } else {
+                                        return '';
+                                    }
+                                }
+                            },
+                            { data: 'productQuantity'},                           
+                            {
+                                data: 'createdOn',
+                                render: function (data, type, row) {
+                                    var dateObj = new Date(data);
+                                    var formattedDate = formatDate(dateObj);
+                                    return formattedDate;
+                                }
+                            }
+                        ]
+                    });
+                })
+                .catch(error => {
+                    console.log(error);
+                });
+
+            $("#create").click(function (event) {
+                event.preventDefault();
+            });
+            var productSelect = document.getElementById('product');
+            var selectedProductName = '';
+
+            productSelect.addEventListener('change', function () {
+                selectedProductName = productSelect.options[productSelect.selectedIndex].textContent;
+                console.log("Selected product name: " + selectedProductName);
+                localStorage.setItem("productname", selectedProductName);
+            });
+            $("#clear").click(function () {
+                location.reload();
+            });
+        });
+
+        async function loadCategories() {
+            try {
+                var categoryDropDown = await fetch('@baseUrl/Category/1.0/GetCategoryDropDown', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + localStorage.getItem("token")
+                    }
+                });
+                if (!categoryDropDown.ok) {
+                    throw new Error("An error occurred");
+                } console.log("below if");
+                var data = await categoryDropDown.json();
+                var selecElement = $("#category")[0];
+                selecElement.innerHTML = '';
+                var defaultOption = $("<option></option>")[0];
+                defaultOption.value = '';
+                defaultOption.textContent = 'Select Category';
+                selecElement.appendChild(defaultOption);
+
+                if (data && typeof data === 'object') {
+                    console.log("Inside");
+                    for (var key in data) {
+                        if (data.hasOwnProperty(key)) {
+
+                            var option = $("<option></option>")[0];
+                            option.value = data[key].id;
+                            option.textContent = data[key].name;
+                            selecElement.appendChild(option);
+                        }
+                    }
+                }
+                else {
+                    console.log("Data is not in the correct format");
+                }
+            }
+            catch (error) {
+                console.log("There was an error", error);
+            }
+        }
+
+        async function loadProducts() {
+            try {
+                var categoryId= $("#category").val();
+                var categoryDropDown = await fetch('@baseUrl/Product/1.0/GetProductBasedCategory/' + categoryId, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + localStorage.getItem("token")
+                    }
+                });
+                if (!categoryDropDown.ok) {
+                    throw new Error("An error occurred");
+                } console.log("below if");
+                var data = await categoryDropDown.json();
+                var selecElement = $("#product")[0];
+                selecElement.innerHTML = '';
+                var defaultOption = $("<option></option>")[0];
+                defaultOption.value = '';
+                defaultOption.textContent = 'Select Product';
+                selecElement.appendChild(defaultOption);
+
+                if (data && typeof data === 'object') {
+                    console.log("Inside");
+                    for (var key in data) {
+                        if (data.hasOwnProperty(key)) {
+
+                            var option = $("<option></option>")[0];
+                            option.value = data[key].id;
+                            option.textContent = data[key].name;
+                            selecElement.appendChild(option);
+                           
+                            localStorage.getItem("productname", option.textContent);
+                            console.log(data[key].name, "option.textContent");
+                        }
+                    }
+                }
+                else {
+                    console.log("Data is not in the correct format");
+                }
+            }
+            catch (error) {
+                console.log("There was an error", error);
+            }
+        }
+
+        async function UpdateStocks() {
+            var productId = $("#product").val();
+            var productName = localStorage.getItem("productname");
+            var category = $("#category").val();
+            var quantity = parseInt($("#quantity").val(), 10);
+            var activeStatus = true;
+            var modifiedBy = localStorage.getItem("AdminId");
+            var accessToken = localStorage.getItem("token");
+            let errors = [];
+            if (category == "") {
+                errors.push("Category is required");
+                $("#categoryError").text("Category is required");
+            }
+            else {
+                $("#categoryError").text("");
+            }
+            if (productId == "") {
+                errors.push("Product is required");
+                $("#productError").text("Category is required");
+            }
+            else {
+                $("#productError").text("");
+            }
+            if (quantity == "") {
+                errors.push("Quantity is required");
+                $("#PQty").text("Quantity is required");
+            } 
+            else if (quantity <= 0) {
+                errors.push("Invalid Quantity: Quantity must be greater than 0");
+                $("#PQty").text("Invalid Quantity: Quantity must be greater than 0");
+            }
+            else if (!Number.isInteger(Number(quantity))) {
+                errors.push("Invalid Quantity");
+                $("#PQty").text("Invalid Quantity");
+            }
+            else {
+                $("#PQty").text("");
+            }
+            if (errors.length === 0) {
+                var data = {
+                    Id: productId,
+                    ProductName: productName,
+                    CategoryId: category,
+                    ProductQuantity: quantity,
+                    ActiveStatus: activeStatus, // Convert boolean to string
+                    ModifiedBy: modifiedBy
+                }
+                console.log(data);
+                const formData = new FormData();
+                for (const key in data) {
+                    formData.append(key, data[key]);
+                }
+                const response = await fetch('@baseUrl/Product/1.0/' + productId, {
+                    method: 'PUT',
+                    headers: {                       
+                        'Authorization': 'Bearer ' + accessToken,
+                    },
+                    body: formData
+                });
+                if (response.status === 204) {
+                    Swal.fire(
+                        'Success!',
+                        'Stockes Updated successfully.',
+                        'success'
+                    ).then(() => {
+                        const redirectTo = $("#RedirectTo").val();
+                        window.location.href = redirectTo;
+                    });
+                }
+                else if (response.status === 400) {
+                    Swal.fire(
+                        'Error!',
+                        'An error occurred while updating the item.',
+                        'error'
+                    ).then(() => {
+                        const redirectTo = $("#RedirectTo").val();
+                        window.location.href = redirectTo;
+                    });
+                }
+                else {
+                    Swal.fire(
+                        'Error!',
+                        'Failed to update the item. Please try again.',
+                        'error'
+                    ).then(() => {
+                        const redirectTo = $("#RedirectTo").val();
+                        window.location.href = redirectTo;
+                    });
+                }
+            }
+        }
+
+        function formatDate(date) {
+            var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            var dd = date.getDate();
+            var mm = months[date.getMonth()];
+            var yyyy = date.getFullYear();
+            var hh = date.getHours();
+            var min = date.getMinutes();
+            var ss = date.getSeconds();
+            var ampm = hh >= 12 ? 'PM' : 'AM';
+            hh = hh % 12;
+            hh = hh ? hh : 12; // the hour '0' should be '12'
+            min = min < 10 ? '0' + min : min;
+            ss = ss < 10 ? '0' + ss : ss;
+            var formattedDate = dd + ' ' + mm + ' ' + yyyy;
+            return formattedDate;
+        }
+
+    </script>
+</body>
+</html>
